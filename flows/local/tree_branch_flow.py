@@ -1,5 +1,6 @@
 
-from metaflow import FlowSpec, step, card
+from metaflow import FlowSpec, step, card, current
+from metaflow.cards import Markdown, Table
 
 class Branch_Flow(FlowSpec):
     """
@@ -63,7 +64,8 @@ class Branch_Flow(FlowSpec):
         self.scores = cross_val_score(self.clf, self.X, self.y, cv=5)
 
         self.next(self.choose_model)
-                        
+
+    @card                 
     @step
     def choose_model(self, inputs):
         """
@@ -76,9 +78,18 @@ class Branch_Flow(FlowSpec):
                    np.mean(inp.scores)
 
             
+        current.card.append(Markdown('# Choose Model'))
         self.results = sorted(map(score, inputs), key=lambda x: -x[1]) 
         self.model = self.results[0][0]
+        current.card.append(Markdown(f'## Best Model: {self.results[0][0]}'))
+        current.card.append(Markdown('## Results:'))
+        rows = [ f"- {model} - {score}" for model, score in self.results]
+        print(rows)
+        for r in rows:
+            current.card.append(Markdown(r))
+
         self.next(self.end)
+
         
     @step
     def end(self):

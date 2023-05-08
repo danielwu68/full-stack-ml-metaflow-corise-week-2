@@ -2,10 +2,8 @@
 from metaflow import FlowSpec, step, card
 
 
-class TFlow3(FlowSpec):
-    """
-    train a boosted tree
-    """
+class TFlow5(FlowSpec):
+    
     @card
     @step
     def start(self):
@@ -14,10 +12,8 @@ class TFlow3(FlowSpec):
         """
         import pandas as pd
         self.df = pd.read_csv('./data/titanic.csv')
-        self.next(self.model1, self.model2)
+        self.next(self.model1, self.model2, self.data_prep)
 
-
-    @card
     @step
     def model1(self):
         """
@@ -25,6 +21,7 @@ class TFlow3(FlowSpec):
         """
         import pandas as pd
         from sklearn.metrics import accuracy_score
+        print("model1 starting... - none survived")
         self.clf = 'model_1'
         self.df['model'] = 0
         self.score = accuracy_score(self.df['Survived'], self.df['model'])
@@ -32,7 +29,6 @@ class TFlow3(FlowSpec):
         self.next(self.choose_model)
         
         
-    @card
     @step
     def model2(self):
         """
@@ -40,13 +36,60 @@ class TFlow3(FlowSpec):
         """
         import pandas as pd
         from sklearn.metrics import accuracy_score
+        print("model2 starting... - rule with Sex")
         self.clf = 'model_2'
         self.df['model'] = self.df.Sex == 'female'
         self.score = accuracy_score(self.df['Survived'], self.df['model'])
         
         self.next(self.choose_model)
+
+
+    @step
+    def data_prep(self):
+        """
+        prep data for tree-based model
+        """
+        import numpy as np
+        import pandas as pd
+        # Store target variable of training data in a safe place
+        survived = self.df.Survived
+
+        # 
+        df = self.df.drop(['Survived'], axis=1)
+
+        # Impute missing numerical variables
+        df['Age'] = df.Age.fillna(df.Age.median())
+        df['Fare'] = df.Fare.fillna(df.Fare.median())
+
+        df = pd.get_dummies(df, columns=['Sex'], drop_first=True)
+        df = df[['Sex_male', 'Fare', 'Age','Pclass', 'SibSp']]
+
+        X = df.values
+        y = survived.values
+
+        from sklearn.model_selection import train_test_split
+
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X, y, test_size=0.33, random_state=42)
+
+        self.grid_points = np.arange(1, 9)
+
+        self.next(self.model3, foreach='grid_points')
+
+    @step
+    def model3(self):
+        """
+        make predictions
+        """
+        from sklearn import tree
+
+        # Instantiate model and fit to data
+        self.clf = tree.DecisionTreeClassifier(max_depth=self.input)
+        self.clf.fit(self.X_train, self.y_train)
+        self.score = self.clf.score(self.X_test, self.y_test)
+
+        self.next(self.choose_model)
         
-    @card
     @step
     def choose_model(self, inputs):
         """
@@ -65,7 +108,6 @@ class TFlow3(FlowSpec):
         self.next(self.end)
 
 
-    @card
     @step
     def end(self):
         """
@@ -75,8 +117,8 @@ class TFlow3(FlowSpec):
         print('\n'.join('%s %f' % res for res in self.results))
         print('Best model:')
         print(self.model)
-        print("TFlow3 is all done.")
+        print("TFlow5 is all done.")
 
 
 if __name__ == "__main__":
-    TFlow3()
+    TFlow5()
